@@ -1,0 +1,90 @@
+local ToolLib = {}
+
+local RS = game:GetService("ReplicatedStorage").Events
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+local function getEvents(category)
+    local events = {}
+    for _, v in pairs(RS[category]:GetChildren()) do
+        if v:IsA("RemoteEvent") then
+            events[v.Name] = v
+        end
+    end
+    return events
+end
+
+local data = {
+    g = getEvents("Gun"),
+    m = getEvents("Melee"),
+    p = getEvents("Powers"),
+    s = getEvents("Sword")
+}
+
+local function listItems()
+    for k, v in pairs(data) do
+        print(k:upper() .. ": " .. table.concat(table.keys(v), ", "))
+    end
+end
+
+local function createTool(name, category)
+    if not data[category] or not data[category][name] then return end
+    
+    local tool = Instance.new("Tool")
+    tool.Name = name
+    tool.RequiresHandle = false
+    tool.CanBeDropped = false
+    tool.Parent = Player.Backpack
+
+    local gui = Instance.new("ScreenGui", Player.PlayerGui)
+    gui.Name = "ToolGui"
+    gui.ResetOnSpawn = false
+    gui.Enabled = true
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0, 80, 0, 230)
+    frame.Position = UDim2.new(1, -90, 0.5, -115)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.BackgroundTransparency = 0.5
+
+    local layout = Instance.new("UIListLayout", frame)
+    layout.Padding = UDim.new(0, 10)
+    
+    local keys = {}
+    for _, v in pairs(game:GetService("ReplicatedStorage").Animations.Fighting[category][name]:GetChildren()) do
+        if #v.Name == 1 then
+            table.insert(keys, v.Name)
+        end
+    end
+    
+    for _, key in ipairs(keys) do
+        local btn = Instance.new("TextButton", frame)
+        btn.Size = UDim2.new(0, 50, 0, 50)
+        btn.Text = key
+        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.MouseButton1Click:Connect(function()
+            data[category][name]:FireServer(key)
+        end)
+    end
+
+    tool.Equipped:Connect(function()
+        gui.Enabled = true
+        local inputConn = UIS.InputBegan:Connect(function(input, processed)
+            if processed then return end
+            if data[category][name] and table.find(keys, input.KeyCode.Name) then
+                data[category][name]:FireServer(input.KeyCode.Name)
+            end
+        end)
+        tool.Unequipped:Connect(function()
+            inputConn:Disconnect()
+            gui.Enabled = false
+        end)
+    end)
+end
+
+ToolLib.Create = createTool
+ToolLib.List = listItems
+
+return ToolLib
